@@ -107,9 +107,9 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
-    [String]$appName = ''
-    [String]$appVersion = ''
+    [String]$appVendor = 'Microsoft'
+    [String]$appName = 'ASP.NET Core Runtime'
+    [String]$appVersion = '6.0'
     [String]$appArch = ''
     [String]$appLang = 'DE'
     [String]$appRevision = '01'
@@ -190,15 +190,12 @@ Try {
         [String]$installPhase = 'Pre-Installation'
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
-        Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        Show-InstallationWelcome #-CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Installation tasks here>
-		# Remove any previous version
-		<# Remove-MSIApplications -Name '' #>
-
 
         ##*===============================================
         ##* INSTALLATION
@@ -206,12 +203,32 @@ Try {
         [String]$installPhase = 'Installation'
 
         ## <Perform Installation tasks here>
+		## ASP.NET Core Runtime 6.0 Hosting Bundle
+        $OtherPath = Get-ChildItem -Path "$dirFiles" -Include dotnet-hosting-6.0.*win.exe -File -Recurse -ErrorAction SilentlyContinue
+        If($OtherPath.Exists) {
+			Write-Log -Message "Found $($OtherPath.FullName), now attempting to install ASP.NET Core Runtime 6.0."
+			Show-InstallationProgress "Installing ASP.NET Core Runtime 6.0 Hosting Bundle. This may take some time. Please wait..."
+			Execute-Process -Path "$OtherPath" -Parameters "/install /quiet /norestart /log $configToolkitLogDir\ASP_NET_Core_Hosting_Bundle_6_0-Install.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
+
+        ## ASP.NET Core Runtime 6.0 (x86)
+        $32BitFilePath = Get-ChildItem -Path "$dirFiles" -Include aspnetcore-runtime-6.0.*win-x86.exe -File -Recurse -ErrorAction SilentlyContinue
+        If($32BitFilePath.Exists) {
+			Write-Log -Message "Found $($32BitFilePath.FullName), now attempting to install ASP.NET Core Runtime 6.0 (x86)."
+			Show-InstallationProgress "Installing ASP.NET Core Runtime 6.0 (x86). This may take some time. Please wait..."
+			Execute-Process -Path "$32BitFilePath" -Parameters "/install /quiet /norestart /log $configToolkitLogDir\ASP_NET_Core_Runtime_6_0_x86-Install.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
 		
-		# Install the base MSI and apply a transform
-		Execute-MSI -Action Install -Path '$dirFiles\$InstallFile' -Parameters '$InstallParameters' -Transform '$dirFiles\$TransformFile' -ContinueError $false
-		
-		# Install the patch
-		<# Execute-MSI -Action Patch -Path '' #>
+        ## ASP.NET Core Runtime 6.0 (x64)
+        $64BitFilePath = Get-ChildItem -Path "$dirFiles" -Include aspnetcore-runtime-6.0.*win-x64.exe -File -Recurse -ErrorAction SilentlyContinue
+        If($64BitFilePath.Exists) {
+			Write-Log -Message "Found $($64BitFilePath.FullName), now attempting to install ASP.NET Core Runtime 6.0 (x64)."
+			Show-InstallationProgress "Installing ASP.NET Core Runtime 6.0 (x64). This may take some time. Please wait..."
+			Execute-Process -Path "$64BitFilePath" -Parameters "/install /quiet /norestart /log $configToolkitLogDir\ASP_NET_Core_Runtime_6_0_x64-Install.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -219,32 +236,7 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
-		
-		# Remove desktop icons
-		<# if (Test-Path -Path "$Env:Public\Desktop\<Filename>.lnk") {
-			Remove-File -Path "$Env:Public\Desktop\<Filename>.lnk"
-		} #>
-		
-		# Remove desktop icons from each user profile and the default profile
-		<# [String[]]$ProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty 'ProfilePath'
-		foreach ($Profile in $ProfilePaths) {
-			if (Test-Path -Path "$Profile\Desktop\<Filename>.lnk") {
-				Remove-File -Path "$Profile\Desktop\<Filename>.lnk"
-			}
-		} #>
-		
-		# Setting ntfs rights
-		<# ICACLS "<PATH_TO_FOLDER>" /grant:r('*S-1-5-32-545'+':(OI)(CI)M') /C /Q /T #>
-		<# ICACLS "<PATH_TO_FOLDER>" /inheritance:e /T /Q /C #>
-		
-		# Path:	    HKLM\SOFTWARE\PSADT\Application Detection\
-		# Key:      NAME_VERSION_ARCH
-		# Value:    1
-		<# Set-SCCMAppDetectRegistryKey -appName $SCCMDetectionKey -Value '1' #>
-		
-		# Send reboot to SCCM
-		<# mainExitCode = 3010 #>
-		
+
     }
     ElseIf ($deploymentType -ieq 'Uninstall') {
         ##*===============================================
@@ -253,13 +245,12 @@ Try {
         [String]$installPhase = 'Pre-Uninstallation'
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
-        Show-InstallationWelcome -CloseApps 'iexplore' #-CloseAppsCountdown 60
+        Show-InstallationWelcome #-CloseApps 'iexplore' -CloseAppsCountdown 60
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Uninstallation tasks here>
-
 
         ##*===============================================
         ##* UNINSTALLATION
@@ -267,17 +258,34 @@ Try {
         [String]$installPhase = 'Uninstallation'
 
         ## <Perform Uninstallation tasks here>
-		
-		# Remove this version
-		Execute-MSI -Action Uninstall -Path "$ProductCode" -ContinueOnError $false
+		## Uninstall Any Existing Version of ASP.NET Core Runtime Hosting Bundle 6.0
+        $SourceCache1 = Get-ChildItem -Path "C:\ProgramData\Package Cache\*" -Include dotnet-hosting-6.0.*win*.exe -Recurse -ErrorAction SilentlyContinue
+        ForEach ($item in $SourceCache1) {
+			Write-Log -Message "Found $($item.FullName), now attempting to uninstall ASP.NET Core Runtime 6.0."
+			Execute-Process -Path "$item" -Parameters "/uninstall /quiet /norestart /log $configToolkitLogDir\ASP_NET_Core_Hosting_Bundle_6_0-Uninstall.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
+
+        ## Uninstall Any Existing Version of ASP.NET Core Runtime 6.0
+        $SourceCache2 = Get-ChildItem -Path "C:\ProgramData\Package Cache\*" -Include dotnet-runtime-6.0.*win*.exe -Recurse -ErrorAction SilentlyContinue
+        ForEach ($item in $SourceCache2) {
+			Write-Log -Message "Found $($item.FullName), now attempting to uninstall ASP.NET Core Runtime 6.0."
+			Execute-Process -Path "$item" -Parameters "/uninstall /quiet /norestart /log $configToolkitLogDir\ASP_NET_Core_Runtime_6_0-Uninstall.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
+
+        ## Uninstall Any Existing Version of ASP.NET Core Runtime Shared Framework 6.0
+        $SourceCache3 = Get-ChildItem -Path "C:\ProgramData\Package Cache\*" -Include aspnetcore-runtime-6.0.*win*.exe -Recurse -ErrorAction SilentlyContinue
+        ForEach ($item in $SourceCache3) {
+			Write-Log -Message "Found $($item.FullName), now attempting to uninstall ASP.NET Core Runtime 6.0."
+			Execute-Process -Path "$item" -Parameters "/uninstall /quiet /norestart /log $configToolkitLogDir\ASP_NET_Shared_Framework_6_0-Uninstall.log" -WindowStyle Hidden
+			Start-Sleep -Seconds 5
+        }
 
         ##*===============================================
         ##* POST-UNINSTALLATION
         ##*===============================================
         [String]$installPhase = 'Post-Uninstallation'
-
-        ## <Perform Post-Uninstallation tasks here>
-		<# Remove-SCCMAppDetectRegistryKey -AppName $SCCMDetectionKey #>
 
     }
     ElseIf ($deploymentType -ieq 'Repair') {
